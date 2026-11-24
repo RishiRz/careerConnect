@@ -85,13 +85,21 @@ export function createApp(): Application {
     );
   }
 
-  // ── Session store (Redis-backed) ──────────────────────────────────
+  // ── Session store (Redis or Memory fallback) ─────────────────────
   const redisClient = getRedisClient();
-  const redisStore = new RedisStore({ client: redisClient, prefix: 'cc_sess:' });
+  let sessionStore: any;
+
+  if (redisClient) {
+    sessionStore = new RedisStore({ client: redisClient, prefix: 'cc_sess:' });
+    logger.info('Using Redis session store');
+  } else {
+    sessionStore = new session.MemoryStore();
+    logger.info('Using in-memory session store (dev mode)');
+  }
 
   app.use(
     session({
-      store: redisStore,
+      store: sessionStore,
       secret: env.SESSION_SECRET,
       name: 'cc.sid',
       resave: false,
