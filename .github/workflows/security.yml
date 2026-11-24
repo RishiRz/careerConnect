@@ -1,0 +1,44 @@
+name: Security Scan — CareerConnect
+
+on:
+  schedule:
+    - cron: '0 2 * * 1'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  dependency-audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Audit backend
+        working-directory: backend
+        run: npm ci && npm audit --audit-level=high
+
+      - name: Audit frontend
+        working-directory: frontend
+        run: npm ci && npm audit --audit-level=high
+
+  semgrep:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/typescript
+            p/nodejs
+            p/owasp-top-ten
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
