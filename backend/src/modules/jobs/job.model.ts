@@ -2,7 +2,13 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export type JobType = 'full-time' | 'part-time' | 'contract' | 'internship' | 'remote' | 'hybrid';
 export type ExperienceLevel = 'entry' | 'mid' | 'senior' | 'lead' | 'executive';
-export type JobStatus = 'draft' | 'published' | 'paused' | 'closed' | 'rejected';
+export type JobStatus =
+  | 'draft'
+  | 'pending'
+  | 'published'
+  | 'paused'
+  | 'closed'
+  | 'rejected';
 
 export interface IJob extends Document {
   _id: mongoose.Types.ObjectId;
@@ -49,7 +55,11 @@ const jobSchema = new Schema<IJob>(
     salaryCurrency: { type: String, maxlength: 10, default: 'USD' },
     skills: [{ type: String, maxlength: 50 }],
     applicationDeadline: { type: Date },
-    status: { type: String, enum: ['draft', 'published', 'paused', 'closed', 'rejected'], default: 'draft' },
+    status: {
+      type: String,
+      enum: ['draft', 'pending', 'published', 'paused', 'closed', 'rejected'],
+      default: 'draft'
+    },
     rejectionReason: { type: String, maxlength: 500 },
     moderatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     viewCount: { type: Number, default: 0 },

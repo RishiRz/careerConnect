@@ -148,17 +148,30 @@ export async function adminModerateJob(
   approve: boolean,
   rejectionReason?: string
 ) {
-  if (!mongoose.isValidObjectId(jobId)) throw new AppError('Invalid job ID.', 400);
+  if (!mongoose.isValidObjectId(jobId)) {
+    throw new AppError('Invalid job ID.', 400);
+  }
 
   const job = await Job.findById(jobId).exec();
-  if (!job) throw new AppError('Job not found.', 404);
+
+  if (!job) {
+    throw new AppError('Job not found.', 404);
+  }
+
+  if (job.status !== 'pending') {
+    throw new AppError('Only pending jobs can be moderated.', 400);
+  }
+
+  job.status = approve ? 'published' : 'rejected';
+
+  job.moderatedBy = new mongoose.Types.ObjectId(adminId);
 
   if (!approve) {
-    job.status = 'rejected';
-    if (rejectionReason) job.rejectionReason = rejectionReason.substring(0, 500);
-    job.moderatedBy = new mongoose.Types.ObjectId(adminId);
+    job.rejectionReason = rejectionReason
+      ? rejectionReason.substring(0, 500)
+      : 'No reason provided';
   } else {
-    job.moderatedBy = new mongoose.Types.ObjectId(adminId);
+    job.rejectionReason = undefined;
   }
 
   await job.save();
@@ -169,10 +182,37 @@ export async function adminModerateJob(
     action: 'job.moderated',
     targetId: job._id,
     targetType: 'Job',
-    metadata: { approved: approve, rejectionReason },
+    metadata: {
+      approved: approve,
+      status: job.status,
+      rejectionReason,
+    },
   });
 
   return job;
+}
+
+export async function adminGetPendingJobs(page = 1, limit = 20) {
+  const skip = (page - 1) * limit;
+  const filter = { status: 'pending' };
+
+  const [jobs, total] = await Promise.all([
+    Job.find(filter)
+      .populate('companyId', 'name slug logoKey location')
+      .populate('postedBy', 'firstName lastName email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean()
+      .exec(),
+
+    Job.countDocuments(filter),
+  ]);
+
+  return {
+    jobs,
+    pagination: buildPaginationMeta(page, limit, total),
+  };
 }
 
 export async function adminGetAuditLogs(page = 1, limit = 50, action?: string) {

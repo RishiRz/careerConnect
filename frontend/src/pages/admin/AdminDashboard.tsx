@@ -5,7 +5,9 @@ import { api } from '../../lib/api';
 
 export function AdminDashboard() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'pending-companies' | 'users' | 'audit'>('pending-companies');
+  const [activeTab, setActiveTab] = useState<
+  'pending-companies' | 'pending-jobs' | 'users' | 'audit'
+  >('pending-companies');
 
   // Stats query
   const { data: statsData } = useQuery({
@@ -24,6 +26,22 @@ export function AdminDashboard() {
       return res.data;
     },
   });
+
+  // Pending jobs query
+  const {
+    data: jobsData,
+    isLoading: jobsLoading,
+    error: jobsError,
+  } = useQuery({
+    queryKey: ['admin-pending-jobs'],
+    queryFn: async () => {
+      const res = await api.get('/admin/jobs/pending');
+      return res.data;
+    },
+    enabled: activeTab === 'pending-jobs',
+  });
+
+  const pendingJobs = jobsData?.data || [];
 
   // Users query
   const { data: usersData, isLoading: usersLoading } = useQuery({
@@ -53,6 +71,32 @@ export function AdminDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-pending-companies'] });
       queryClient.invalidateQueries({ queryKey: ['admin-stats'] });
+    },
+  });
+
+  const moderateJobMutation = useMutation({
+  mutationFn: async ({
+    id,
+    approve,
+    rejectionReason,
+  }: {
+    id: string;
+    approve: boolean;
+    rejectionReason?: string;
+  }) => {
+    const res = await api.patch(`/admin/jobs/${id}/moderate`, {
+      approve,
+      rejectionReason,
+    });
+    return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['admin-pending-jobs'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['admin-stats'],
+      });
     },
   });
 
@@ -125,6 +169,16 @@ export function AdminDashboard() {
           Company Verifications ({pendingCompanies.length})
         </button>
         <button
+          onClick={() => setActiveTab('pending-jobs')}
+          className={`pb-3 text-xs font-semibold border-b-2 transition-colors ${
+            activeTab === 'pending-jobs'
+              ? 'border-purple-600 text-purple-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Pending Jobs ({pendingJobs.length})
+        </button>
+        <button
           onClick={() => setActiveTab('users')}
           className={`pb-3 text-xs font-semibold border-b-2 transition-colors ${
             activeTab === 'users'
@@ -186,6 +240,104 @@ export function AdminDashboard() {
                       className="btn-secondary text-xs py-1.5 px-3 text-red-600 hover:bg-red-50 flex items-center gap-1"
                     >
                       <XCircle className="h-3.5 w-3.5" /> Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {activeTab === 'pending-jobs' && (
+        <div className="space-y-4">
+          {jobsLoading ? (
+            <p className="text-xs text-gray-400">Loading pending jobs...</p>
+          ) : jobsError ? (
+            <p className="text-sm text-red-600">
+              Unable to load pending jobs. Check your admin API.
+            </p>
+          ) : pendingJobs.length === 0 ? (
+            <div className="card text-center py-12 border-dashed border-2">
+              <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-xs font-semibold text-gray-800">
+                No pending jobs
+              </p>
+              <p className="text-[11px] text-gray-500 mt-1">
+                Recruiter-submitted jobs awaiting approval will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {pendingJobs.map((job: any) => (
+                <div
+                  key={job._id}
+                  className="card p-5 border-gray-200 flex flex-col gap-4"
+                >
+                  <div>
+                    <h3 className="font-bold text-base text-gray-900">
+                      {job.title}
+                    </h3>
+
+                    <p className="text-xs text-gray-500 mt-1">
+                      {job.companyId?.name || 'Unknown Company'}
+                      {' • '}
+                      {job.location}
+                    </p>
+
+                    <p className="text-xs text-gray-500 mt-1">
+                      Posted by: {job.postedBy?.firstName || ''}
+                      {' '}
+                      {job.postedBy?.lastName || ''}
+                      {' • '}
+                      {job.postedBy?.email || 'Unknown recruiter'}
+                    </p>
+
+                    <p className="text-xs text-gray-600 mt-3">
+                      {job.description?.slice(0, 250)}
+                      {job.description?.length > 250 ? '...' : ''}
+                    </p>
+
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <span className="badge bg-orange-100 text-orange-700">
+                        {job.status}
+                      </span>
+                      <span className="badge bg-gray-100 text-gray-700">
+                        {job.jobType}
+                      </span>
+                      <span className="badge bg-gray-100 text-gray-700">
+                        {job.experienceLevel}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() =>
+                        moderateJobMutation.mutate({
+                          id: job._id,
+                          approve: true,
+                        })
+                      }
+                      disabled={moderateJobMutation.isPending}
+                      className="btn-primary text-xs py-2 px-4 bg-green-600 hover:bg-green-700 flex items-center gap-1"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      Approve
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        moderateJobMutation.mutate({
+                          id: job._id,
+                          approve: false,
+                          rejectionReason: 'Does not meet job posting requirements.',
+                        })
+                      }
+                      disabled={moderateJobMutation.isPending}
+                      className="btn-secondary text-xs py-2 px-4 text-red-600 hover:bg-red-50 flex items-center gap-1"
+                    >
+                      <XCircle className="h-4 w-4" />
+                      Reject
                     </button>
                   </div>
                 </div>

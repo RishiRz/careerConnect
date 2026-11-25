@@ -10,12 +10,8 @@ build/
 
 # Environment files
 .env
-.env.local
-.env.development
-.env.production
-.env.test
-backend/.env
-frontend/.env
+.env.*
+!.env.example
 
 # Logs
 logs/
@@ -44,3 +40,10 @@ Thumbs.db
 # Misc
 .cache/
 *.pem
+
+# Temporary files
+*.tmp
+*.bak
+
+# Local uploads and user files
+uploads/

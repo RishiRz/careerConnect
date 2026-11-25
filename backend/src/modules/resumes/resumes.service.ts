@@ -30,22 +30,30 @@ function validateFileSignature(buffer: Buffer, ext: string): boolean {
   return false;
 }
 
+
 async function detectMimeType(buffer: Buffer): Promise<string | null> {
   try {
-    const fileType = await (eval('import("file-type")') as Promise<typeof import('file-type')>);
-    const result = await fileType.fileTypeFromBuffer(buffer);
-    if (result) return result.mime;
-  } catch {
-    // Fallback if ESM dynamic import fails in testing environment
-  }
+    const fileType = await (
+      eval('import("file-type")') as Promise<{
+        fileTypeFromBuffer: (
+          input: Uint8Array
+        ) => Promise<{
+          ext: string;
+          mime: string;
+        } | undefined>;
+      }>
+    );
 
-  if (buffer.slice(0, 4).equals(PDF_SIGNATURE)) {
-    return 'application/pdf';
+    const result = await fileType.fileTypeFromBuffer(buffer);
+
+    return result?.mime ?? null;
+  } catch (error) {
+    logger.error('File type detection failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    return null;
   }
-  if (buffer.slice(0, 4).equals(DOCX_SIGNATURE)) {
-    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-  }
-  return null;
 }
 
 export async function uploadResume(
@@ -88,10 +96,13 @@ export async function uploadResume(
       })
     );
   } catch (err: unknown) {
-    logger.warn('S3 upload skipped or failed in non-configured dev environment', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
+  logger.error('Resume upload failed', {
+    error: err instanceof Error ? err.message : String(err),
+    userId,
+  });
+
+  throw new AppError('Resume upload failed. Please try again.', 500);
+}
 
   const resume = await Resume.create({
     userId: new mongoose.Types.ObjectId(userId),
@@ -150,9 +161,14 @@ export async function getResumeDownloadUrl(resumeId: string, requesterId: string
       { expiresIn: 300 }
     );
     return url;
-  } catch {
-    return `https://storage.local.dev/${resume.storageKey}`;
-  }
+  } catch (error) {
+  logger.error('Resume download URL generation failed', {
+    resumeId,
+    error: error instanceof Error ? error.message : String(error),
+  });
+
+  throw new AppError('Unable to generate resume download URL.', 500);
+}
 }
 
 export async function deleteResume(resumeId: string, userId: string): Promise<void> {

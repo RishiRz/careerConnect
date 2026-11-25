@@ -21,8 +21,11 @@ export const createJobSchema = z.object({
 export const updateJobSchema = createJobSchema.partial().strict();
 
 export const jobQuerySchema = z.object({
-  page: z.string().transform(Number).pipe(z.number().int().min(1)).optional().default('1'),
-  limit: z.string().transform(Number).pipe(z.number().int().min(1).max(50)).optional().default('20'),
+  
+    page: z.string().transform(Number).pipe(z.number().int().min(1)).optional().default(1),
+
+    limit: z.string().transform(Number).pipe(z.number().int().min(1).max(50)).optional().default(20),
+
   search: z.string().max(200).trim().optional(),
   location: z.string().max(100).trim().optional(),
   jobType: z.enum(['full-time', 'part-time', 'contract', 'internship', 'remote', 'hybrid']).optional(),
@@ -34,7 +37,7 @@ export const jobQuerySchema = z.object({
 }).strict();
 
 export const updateJobStatusSchema = z.object({
-  status: z.enum(['draft', 'published', 'paused', 'closed']),
+  status: z.enum(['draft', 'pending', 'paused', 'closed']),
 }).strict();
 
 export type CreateJobInput = z.infer<typeof createJobSchema>;

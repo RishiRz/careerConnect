@@ -24,6 +24,7 @@ export async function createJob(
 
   const job = await Job.create({
     ...input,
+    status: 'pending',
     companyId: new mongoose.Types.ObjectId(companyId),
     postedBy: new mongoose.Types.ObjectId(recruiterId),
     applicationDeadline: input.applicationDeadline ? new Date(input.applicationDeadline) : undefined,

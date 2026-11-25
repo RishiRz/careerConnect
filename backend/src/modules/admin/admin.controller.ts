@@ -4,6 +4,7 @@ import {
   adminChangeUserStatus,
   adminGetPendingCompanies,
   adminVerifyCompany,
+  adminGetPendingJobs,
   adminModerateJob,
   adminGetAuditLogs,
   adminGetPlatformStats,
@@ -42,6 +43,32 @@ export async function verifyCompanyHandler(req: Request, res: Response, next: Ne
     const company = await adminVerifyCompany(req.params.id, req.session.userId!, approve === true, rejectionReason);
     successResponse(res, company, approve ? 'Company verified.' : 'Company rejected.');
   } catch (err) { next(err); }
+}
+
+export async function getPendingJobsHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(
+      parseInt(req.query.limit as string) || 20,
+      100
+    );
+
+    const result = await adminGetPendingJobs(page, limit);
+
+    successResponse(
+      res,
+      result.jobs,
+      'Pending jobs retrieved.',
+      200,
+      result.pagination
+    );
+  } catch (err) {
+    next(err);
+  }
 }
 
 export async function moderateJobHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
