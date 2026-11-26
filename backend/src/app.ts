@@ -85,18 +85,28 @@ export function createApp(): Application {
     );
   }
 
-  // ── Session store (Redis or Memory fallback) ─────────────────────
+  
+  // Trust proxy (Render deployment)
+  if (env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1);
+  }
+
+  // Session store
   const redisClient = getRedisClient();
   let sessionStore: any;
 
   if (redisClient) {
-    sessionStore = new RedisStore({ client: redisClient, prefix: 'cc_sess:' });
+    sessionStore = new RedisStore({
+      client: redisClient,
+      prefix: 'cc_sess:',
+    });
     logger.info('Using Redis session store');
   } else {
     sessionStore = new session.MemoryStore();
-    logger.info('Using in-memory session store (dev mode)');
+    logger.info('Using in-memory session store');
   }
 
+  // Session configuration
   app.use(
     session({
       store: sessionStore,
@@ -108,16 +118,12 @@ export function createApp(): Application {
       cookie: {
         httpOnly: true,
         secure: env.NODE_ENV === 'production',
-        sameSite: env.NODE_ENV === 'production' ? 'strict' : 'lax',
+        sameSite: env.NODE_ENV === 'production' ? 'none' : 'lax',
         maxAge: env.SESSION_MAX_AGE_MS,
       },
     })
   );
 
-  // ── Trust proxy (for Render, Vercel, etc.) ────────────────────────
-  if (env.NODE_ENV === 'production') {
-    app.set('trust proxy', 1);
-  }
 
   // ── Global rate limiting ──────────────────────────────────────────
   app.use('/api/', globalRateLimiter);
